@@ -83,7 +83,7 @@ type ProjectManager struct {
 
 func (pm *ProjectManager) AddTask(title string) *Task {
 	nuevaTarea := &Task{
-		ID: fmt.Sprintf("%d", len(pm.sliceTask)+1),
+		ID:    fmt.Sprintf("%d", len(pm.sliceTask)+1),
 		Title: title,
 	}
 
@@ -109,12 +109,12 @@ func main() {
 	// Escribe tu solución aquí
 	notificadorEmail := EmailNotifier{
 		Email: "dev@empresa.com",
-		Host: "smtp.gmail.com",
+		Host:  "smtp.gmail.com",
 	}
 
 	pm1 := ProjectManager{
 		sliceTask: []*Task{},
-		Notifier: notificadorEmail,
+		Notifier:  notificadorEmail,
 	}
 
 	pm1.AddTask("Configurar el servidor")
@@ -122,12 +122,12 @@ func main() {
 
 	notificadorSlack := SlackNotifier{
 		WebhookURL: "https://hooks.slack.com/...",
-		Channel: "#backend-alerts",
+		Channel:    "#backend-alerts",
 	}
 
 	pm2 := ProjectManager{
 		sliceTask: []*Task{},
-		Notifier: notificadorSlack,
+		Notifier:  notificadorSlack,
 	}
 
 	pm2.AddTask("Migrar base de datos")

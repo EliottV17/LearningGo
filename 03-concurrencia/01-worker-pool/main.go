@@ -1,5 +1,11 @@
 package main
 
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
 /*
 EJERCICIO 3.1: Worker Pool Concurrente Robusto (CSP Pattern)
 
@@ -30,6 +36,74 @@ REQUERIMIENTOS:
    - Correr y verificar la solución con el race detector: `go run -race .`
 */
 
+type Job struct {
+	ID int
+	Data string
+	Cost time.Duration
+}
+
+type Result struct {
+	JobID int
+	WorkerID int
+	Output string
+	Duration time.Duration
+	Err error
+}
+
+func worker(id int, jobs <-chan Job, results chan<- Result, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	for job := range jobs{
+		inicio := time.Now()
+
+		time.Sleep(job.Cost)
+
+		txtProcesado := fmt.Sprintf("Procesado dato: %s", job.Data)
+		var err error = nil
+
+		tiempoTranscurrido := time.Since(inicio)
+
+		results <- Result{
+			JobID: job.ID,
+			WorkerID: id,
+			Output: txtProcesado,
+			Duration: tiempoTranscurrido,
+			Err: err,
+		}
+	}
+}
+
 func main() {
 	// Escribe tu solución aquí
+	numWorkers := 3
+	loteJobs := 10
+
+	jobs := make(chan Job, loteJobs)
+	results := make(chan Result, loteJobs)
+
+	var wg sync.WaitGroup
+
+	for w := 1; w <= numWorkers; w++ {
+		wg.Add(1)
+		go worker(w ,jobs, results, &wg)
+	}
+
+	for j := 1; j <= loteJobs; j++ {
+		nuevoTrabajo := Job{
+			ID: j,
+			Data: fmt.Sprintf("Data-%d", j),
+			Cost: time.Millisecond * 500,
+		}
+		jobs <- nuevoTrabajo
+	}
+	close(jobs)
+
+	go func ()  {
+		wg.Wait()
+		close(results)
+	} ()
+
+	for res := range results {
+		fmt.Printf("[Worker %d] finalizó Job %d en %v. Resultado: %s\n", res.WorkerID, res.JobID, res.Duration, res.Output)
+	}
 }

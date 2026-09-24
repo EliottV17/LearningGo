@@ -1,5 +1,13 @@
 package main
 
+import (
+	"context"
+	"fmt"
+	"sync"
+	"time"
+
+)
+
 /*
 EJERCICIO 3.2: Rate Limiter Token Bucket y Multiplexación con Context
 
@@ -26,6 +34,83 @@ REQUERIMIENTOS:
    - Comprobar que ninguna goroutine queda bloqueada en memoria (zero goroutine leaks).
 */
 
+func executeRequest(ctx context.Context, reqID int, tokenBucket <-chan time.Time) error {
+	select {
+	case <-tokenBucket:
+		fmt.Printf("[Petición %d] Token obtenido exitosamente. Ejecutando...\n", reqID)
+		time.Sleep(time.Millisecond * 50)
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 func main() {
 	// Escribe tu solución aquí
+	burstLimit := 3
+	tokenBucket := make(chan time.Time, burstLimit)
+
+	for range burstLimit {
+		tokenBucket <- time.Now()
+	}
+
+	interval := 500 * time.Millisecond
+	ticker := time.NewTicker(interval)
+
+	defer ticker.Stop()
+	done := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case t := <-ticker.C:
+				select {
+				case tokenBucket <- t:
+				default:
+				}
+			}
+		}
+	}()
+
+	totalTimeout := 2 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), totalTimeout)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	exitosas := 0
+	fallidas := 0
+
+	peticiones := 10
+
+	for i := range peticiones{
+		reqID := i + 1
+
+		wg.Add(1)
+
+		go func(id int) {
+			defer wg.Done()
+			err := executeRequest(ctx, id, tokenBucket)
+
+			if err != nil {
+				fmt.Printf("Petición %d abortada: %v\n", id, err)
+				mu.Lock()
+				fallidas++
+				mu.Unlock()
+			} else {
+				fmt.Printf("Petición %d completada con éxito.\n", id)
+				mu.Lock()
+				exitosas++
+				mu.Unlock()
+			}
+		}(reqID)
+	}
+
+	wg.Wait()
+	close(done)
+	fmt.Println("\n--- REPORTE FINAL ---")
+	fmt.Printf("Peticiones exitosas: %d\n", exitosas)
+	fmt.Printf("Peticiones fallidas: %d\n", fallidas)
 }

@@ -1,5 +1,14 @@
 package main
 
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
+)
+
 /*
 EJERCICIO 5.2: Graceful Shutdown en Servidores de Producción
 
@@ -37,4 +46,45 @@ REQUERIMIENTOS:
 
 func main() {
 	// Escribe tu solución aquí
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK\n"))
+	})
+
+	mux.HandleFunc("/slow", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("-> Recibiendo petición lenta...")
+		time.Sleep(5 * time.Second)
+		w.Write([]byte("Operación finalizada\n"))
+		fmt.Println("<- Petición lenta terminada.")
+	})
+
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	go func ()  {
+		fmt.Println("Servidor escuchando en http://localhost:8080")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed{
+			fmt.Printf("Error crítico del servidor: %v\n", err)
+		}
+	} ()
+
+	<-ctx.Done()
+
+	fmt.Println("\n[!] Señal de interrupción recibida. Iniciando Graceful Shutdown")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		fmt.Printf("[X] Apagado forzado por error o timeout: %v\n", err)
+	} else {
+		fmt.Println("[V] Servidor apagado limpiamente. Ninguna petición fue interrumpida.")
+	}
 }

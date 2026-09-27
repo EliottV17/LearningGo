@@ -53,7 +53,7 @@ func countErrors(r io.Reader) (int, error) {
 			if err == io.EOF {
 				break
 			}
-			return 0, nil
+			return 0, err
 		}
 
 		if entry.Level == "ERROR" {
@@ -74,7 +74,7 @@ func main() {
   `
 
 	lectorMemoria := strings.NewReader(datosDePrueba)
-	
+
 	errores, err := countErrors(lectorMemoria)
 	if err != nil {
 		fmt.Println("Error procesando:", err)
